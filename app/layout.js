@@ -1,7 +1,7 @@
 // import { Geist, Geist_Mono } from "next/font/google";
 import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import Header from "@/components/Header";
+import Header from "@/components/header";
 
 import "./globals.css";
 
