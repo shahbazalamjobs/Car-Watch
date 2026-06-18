@@ -22,10 +22,10 @@ export default function Home() {
               Advanced AI Car Search and test drive from thousands of vehicles.
             </p>
           </div>
-        </div>
 
-        {/* Search */}
-        <HomeSearch />
+          {/* Search */}
+          <HomeSearch />
+        </div>
       </section>
 
       {/* Featured Cars */}
@@ -189,27 +189,27 @@ export default function Home() {
 
       {/* CTA section */} 
       <section className="p-15 dotted-background text-white">
-          <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold mb-4">
-              Ready to Find Your Dream Car?
-            </h2>
-            <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-              Join thousands of satisfied customers who found their perfect
-              vehicle through our platform.
-            </p>
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold mb-4">
+            Ready to Find Your Dream Car?
+          </h2>
+          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+            Join thousands of satisfied customers who found their perfect
+            vehicle through our platform.
+          </p>
 
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-              <Button size="lg" className='p-5' variant="secondary" asChild>
-                <Link href='/cars'>View All Cars</Link>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <Button size="lg" className='p-5' variant="secondary" asChild>
+              <Link href='/cars'>View All Cars</Link>
+            </Button>
+            
+            <Show when='signed-out'>
+              <Button size="lg" className='p-5' asChild>
+                <Link href='/sign-in'>Signed In</Link>
               </Button>
-             
-              <Show when='signed-out'>
-                <Button size="lg" className='p-5' asChild>
-                  <Link href='/sign-in'>Signed In</Link>
-                </Button>
-              </Show>
-            </div>
+            </Show>
           </div>
+        </div>
       </section>
 
     </div>
