@@ -1,6 +1,12 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+"use server";
+
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@/lib/supabase";
 import { cookies } from "next/headers";
+import { v4 as uuidv4 } from "uuid";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 
 // Function to convert File to base64
 async function fileToBase64(file) {
@@ -16,14 +22,15 @@ export async function processCarImageWithAi(file) {
       throw new Error("Gemini API key is not configured");
     }
 
-    // Check if API key is available
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     // Initialize Gemini API
-    const base64Image = await fileToBase64(file);
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+    });
 
     // Convert image file to base64
+    const base64Image = await fileToBase64(file);
+
+    // Create image part for the model
     const imagePart = {
       inlineData: {
         data: base64Image,
@@ -43,7 +50,7 @@ export async function processCarImageWithAi(file) {
         7. Fuel type (your best guess)
         8. Transmission type (your best guess)
         9. Price (your best guess)
-        9. Short Description as to be added to a car listing
+        10. Short Description as to be added to a car listing
 
         Format your response as a clean JSON object with these fields:
         {
@@ -62,12 +69,20 @@ export async function processCarImageWithAi(file) {
 
         For confidence, provide a value between 0 and 1 representing how confident you are in your overall identification.
         Only respond with the JSON object, nothing else.
-        `;
+    `;
 
     // Get response from Gemini
-    const result = await model.generateContent([imagePart, prompt]);
-    const response = await result.response;
-    const text = response.text();
+    const result = await ai.models.generateContent({
+      model: "gemini-flash-latest",
+      contents: [
+        {
+          role: "user",
+          parts: [imagePart, { text: prompt }],
+        },
+      ],
+    });
+
+    const text = result.text;
     const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
 
     try {
@@ -112,8 +127,8 @@ export async function processCarImageWithAi(file) {
       };
     }
   } catch (error) {
-    console.error();
-    throw new Error("Gemini API error:" + error.message);
+    console.error("Gemini API error:", error);
+    throw new Error("Gemini API error: " + error.message);
   }
 }
 
@@ -170,39 +185,69 @@ export async function addCar({ carData, images }) {
       }
 
       // Get the public URL for the uploaded file
-      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/car-images/${filePath}`; // disable cache in config
+      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/car-images/${filePath}`;
 
       imageUrls.push(publicUrl);
-
-      if (imageUrls.length === 0) {
-        throw new Error("No valid images were uploaded");
-      }
-
-      // Add the car to the database
-      const car = await db.car.create({
-        data: {
-          id: carId, // Use the same ID we used for the folder
-          make: carData.make,
-          model: carData.model,
-          year: carData.year,
-          price: carData.price,
-          mileage: carData.mileage,
-          color: carData.color,
-          fuelType: carData.fuelType,
-          transmission: carData.transmission,
-          bodyType: carData.bodyType,
-          seats: carData.seats,
-          description: carData.description,
-          status: carData.status,
-          featured: carData.featured,
-          images: imageUrls, // Store the array of image URLs
-        },
-      });
-
-      // Revalidate the cars list page
-      revalidatePath("/admin/cars");
     }
+
+    if (imageUrls.length === 0) {
+      throw new Error("No valid images were uploaded");
+    }
+
+    // Add the car to the database
+    const car = await db.car.create({
+      data: {
+        id: carId,
+        make: carData.make,
+        model: carData.model,
+        year: carData.year,
+        price: carData.price,
+        mileage: carData.mileage,
+        color: carData.color,
+        fuelType: carData.fuelType,
+        transmission: carData.transmission,
+        bodyType: carData.bodyType,
+        seats: carData.seats,
+        description: carData.description,
+        status: carData.status,
+        featured: carData.featured,
+        images: imageUrls,
+      },
+    });
+
+    // Revalidate the cars list page
+    revalidatePath("/admin/cars");
+
+    return {
+      success: true,
+    };
   } catch (error) {
-      throw new Error('Error adding car', error.message);
+    console.error("Error adding car:", error);
+    throw new Error("Error adding car: " + error.message);
   }
+}
+
+// Fetch all cars with simple search
+export async function getCars(search = "") {
+  try {
+    // Build where conditions
+    let where = {};
+
+    // Add search filter
+    if (search) {
+      where.OR = [
+        { make: { contains: search, mode: "insensitive" } },
+        { model: { contains: search, mode: "insensitive" } },
+        { color: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    // Execute main query
+    const cars = await db.car.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    const serializedCars = cars.map(serializeCarData);
+  } catch (error) {}
 }
