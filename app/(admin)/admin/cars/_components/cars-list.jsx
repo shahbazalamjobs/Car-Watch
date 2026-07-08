@@ -39,9 +39,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const CarsList = () => {
   const [search, setSearch] = useState("");
+  const [carToDelete, setCarToDelete] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const router = useRouter();
 
@@ -71,24 +82,54 @@ const CarsList = () => {
     error: updateError,
   } = useFetch(updateCarStatus);
 
+  // Handle errors
   useEffect(() => {
+    if (carsError) {
+      toast.error("Failed to load cars");
+    }
+
+    if (deleteError) {
+      toast.error("Failed to delete car");
+    }
+
+    if (updateError) {
+      toast.error("Failed to update car");
+    }
+  }, [carsError, deleteError, updateError]);
+
+  // Handle successful operations
+  useEffect(() => {
+    if (deleteResult?.success) {
+      toast.success("Car deleted successfully");
+      fetchCars(search);
+    }
+
     if (updateResult?.success) {
       toast.success("Car updated successfully");
       fetchCars(search);
     }
-  }, [updateResult, search]);
+  }, [updateResult, deleteResult]);
+
+  // Handle delete car
+  const handleDeleteCar = async () => {
+    if (!carToDelete) return;
+
+    await deleteCarFn(carToDelete.id);
+    setDeleteDialogOpen(false);
+    setCarToDelete(null);
+  };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
 
-    // api call
+    fetchCars(search);
   };
 
   // Handle toggle featured status
   const handleToggleFeatured = async (car) => {
     await updateCarStatusFn(car.id, { featured: !car.featured });
   };
-  
+
   // Handle status change
   const handleStatusUpdate = async (car, newStatus) => {
     await updateCarStatusFn(car.id, { status: newStatus });
@@ -275,10 +316,60 @@ const CarsList = () => {
               </Table>
             </div>
           ) : (
-            <div></div>
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <CarIcon className="h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-1">
+                No cars found
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {search
+                  ? "No cars match your search criteria"
+                  : "Your inventory is empty. Add cars to get started."}
+              </p>
+              <Button onClick={() => router.push("/admin/cars/create")}>
+                Add Your First Car
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {carToDelete?.make}{" "}
+              {carToDelete?.model} ({carToDelete?.year})? This action cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deletingCar}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteCar}
+              disabled={deletingCar}
+            >
+              {deletingCar ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Car"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
