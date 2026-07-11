@@ -1,21 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "./ui/input";
 import { Camera, Upload } from "lucide-react";
 import { Button } from "./ui/button";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { processImageSearch } from "@/actions/home";
+import useFetch from "@/hooks/use-fetch";
 
 const HomeSearch = () => {
+  const router = useRouter();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [searchImage, setSearchImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isImageSearchActive, setIsImageSearchActive] = useState(false);
 
-  const router = useRouter();
+  // Use the useFetch hook for image processing
+  const {
+    loading: isProcessing,
+    fn: processImageFn,
+    data: processResult,
+    error: processError,
+  } = useFetch(processImageSearch);
+
+  // Handle process result and errors with useEffect
+  useEffect(() => {
+    if (processResult?.success) {
+      const params = new URLSearchParams();
+
+      // Add extracted params to the search
+      if (processResult.data.make) params.set("make", processResult.data.make);
+      if (processResult.data.bodyType)
+        params.set("bodyType", processResult.data.bodyType);
+      if (processResult.data.color)
+        params.set("color", processResult.data.color);
+
+      // Redirect to search results
+      router.push(`/cars?${params.toString()}`);
+    }
+  }, [processResult, router]);
+
+  useEffect(() => {
+    if (processError) {
+      toast.error(
+        "Failed to analyze image: " + (processError.message || "Unknown error"),
+      );
+    }
+  }, [processError]);
 
   const handleImageSearch = async (e) => {
     e.preventDefault();
@@ -24,7 +59,8 @@ const HomeSearch = () => {
       return;
     }
 
-    // ai logic
+    // Use the processImageFn from useFetch hook
+    await processImageFn(searchImage);
   };
 
   const handleTextSubmit = (e) => {
@@ -154,9 +190,13 @@ const HomeSearch = () => {
               <Button
                 type="submit"
                 className="w-full mt-2"
-                disabled={isUploading}
+                disabled={isUploading || isProcessing}
               >
-                {isUploading ? "Uploading..." : "Search with this Image"}
+                {isUploading
+                  ? "Uploading..."
+                  : isProcessing
+                    ? "Analysing Image"
+                    : "Search with this Image"}
               </Button>
             )}
           </form>
